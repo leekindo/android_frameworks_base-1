@@ -49,8 +49,8 @@ import java.util.List;
 @SystemService(Context.BLUETOOTH_SERVICE)
 public final class BluetoothManager {
     private static final String TAG = "BluetoothManager";
-    private static final boolean DBG = true;
-    private static final boolean VDBG = true;
+    private static final boolean DBG = false;
+    private static final boolean VDBG = false;
 
     private final BluetoothAdapter mAdapter;
 
