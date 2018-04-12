@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2017 The OmniROM Project
+ * Copyright (C) 2018 The Dirty Unicorns Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,29 +14,27 @@
  * limitations under the License.
  */
 
-package com.android.systemui.omni;
+package android.content;
 
-import android.widget.TextView;
+import android.content.FontInfo;
 
-public interface IBatteryView  {
+import java.util.Map;
 
-    void setPercentInside(boolean percentInside);
+interface IFontService {
+    /**
+     * Apply a specified font pack
+     * @param info the FontInfo object to apply
+     */
+    void applyFont(in FontInfo info);
 
-    void setChargingImage(boolean chargingImage);
+    /**
+     * @return current FontInfo
+     */
+    FontInfo getFontInfo();
 
-    void setChargingColor(int chargingColor);
-
-    void setChargingColorEnable(boolean value);
-
-    void applyStyle();
-
-    void setFillColor(int color);
-
-    void doUpdateStyle();
-
-    void setPercentTextView(TextView percentTextView);
-
-    void setDottedLine(boolean value);
-
-    void setLowPercentColorEnabled(boolean value);
+    /**
+     * @return A Map<String, List<FontInfo>> of all the packages that provides fonts
+     *         mapped to a list of all the fonts that package provides
+     */
+    Map getAllFonts();
 }
