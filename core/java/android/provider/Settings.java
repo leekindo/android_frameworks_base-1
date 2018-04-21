@@ -4601,6 +4601,24 @@ public final class Settings {
         public static final String STATUS_BAR_BRIGHTNESS_CONTROL = "status_bar_brightness_control";
 
         /**
+         * Hide lockscreen date
+         * @hide
+         */
+        public static final String HIDE_LOCKSCREEN_DATE = "hide_lockscreen_date";
+
+        /**
+         * Hide lockscreen clock
+         * @hide
+         */
+        public static final String HIDE_LOCKSCREEN_CLOCK = "hide_lockscreen_clock";
+
+        /**
+         * Hide lockscreen alarm
+         * @hide
+         */
+        public static final String HIDE_LOCKSCREEN_ALARM = "hide_lockscreen_alarm";
+
+        /**
          * Hold current font name and name of the originating package Uses "|" as a delimiter
          *
          * @hide
@@ -4613,6 +4631,12 @@ public final class Settings {
          * @hide
          */
         public static final String FONT_PACKAGES = "font_packages";
+
+        /**
+         * @hide
+         */
+        public static final String LONG_PRESS_POWER_TORCH =
+                "long_press_power_torch";
 
         /**
          * Settings to backup. This is here so that it's in the same place as the settings
@@ -4688,6 +4712,62 @@ public final class Settings {
          */
         public static final String[] LEGACY_RESTORE_SETTINGS = {
         };
+
+       /**
+         * Enable looking up of phone numbers of nearby places
+         *
+         * @hide
+         */
+        public static final String ENABLE_FORWARD_LOOKUP = "enable_forward_lookup";
+
+        /**
+         * Enable looking up of phone numbers of people
+         *
+         * @hide
+         */
+        public static final String ENABLE_PEOPLE_LOOKUP = "enable_people_lookup";
+
+        /**
+         * Enable looking up of information of phone numbers not in the contacts
+         *
+         * @hide
+         */
+        public static final String ENABLE_REVERSE_LOOKUP = "enable_reverse_lookup";
+
+        /**
+         * The forward lookup provider
+         *
+         * @hide
+         */
+        public static final String FORWARD_LOOKUP_PROVIDER = "forward_lookup_provider";
+
+        /**
+         * The people lookup provider
+         *
+         * @hide
+         */
+        public static final String PEOPLE_LOOKUP_PROVIDER = "people_lookup_provider";
+
+        /**
+         * The reverse lookup provider
+         *
+         * @hide
+         */
+        public static final String REVERSE_LOOKUP_PROVIDER = "reverse_lookup_provider";
+
+        /**
+         * The OpenCNAM paid account ID
+         *
+         * @hide
+         */
+        public static final String DIALER_OPENCNAM_ACCOUNT_SID = "dialer_opencnam_account_sid";
+
+        /**
+         * The OpenCNAM authentication token
+         *
+         * @hide
+         */
+        public static final String DIALER_OPENCNAM_AUTH_TOKEN = "dialer_opencnam_auth_token";
 
         /**
          * These are all public system settings
@@ -4873,8 +4953,20 @@ public final class Settings {
             PRIVATE_SETTINGS.add(LOCKSCREEN_PIN_SCRAMBLE_LAYOUT);
             PRIVATE_SETTINGS.add(BATTERY_SAVER_SYSTEM_BAR_COLOR_ENABLE);
             PRIVATE_SETTINGS.add(STATUS_BAR_BRIGHTNESS_CONTROL);
+            PRIVATE_SETTINGS.add(HIDE_LOCKSCREEN_DATE);
+            PRIVATE_SETTINGS.add(HIDE_LOCKSCREEN_CLOCK);
+            PRIVATE_SETTINGS.add(HIDE_LOCKSCREEN_ALARM);
             PRIVATE_SETTINGS.add(FONT_INFO);
             PRIVATE_SETTINGS.add(FONT_PACKAGES);
+            PRIVATE_SETTINGS.add(LONG_PRESS_POWER_TORCH);
+            PRIVATE_SETTINGS.add(ENABLE_FORWARD_LOOKUP);
+            PRIVATE_SETTINGS.add(ENABLE_PEOPLE_LOOKUP);
+            PRIVATE_SETTINGS.add(ENABLE_REVERSE_LOOKUP);
+            PRIVATE_SETTINGS.add(FORWARD_LOOKUP_PROVIDER);
+            PRIVATE_SETTINGS.add(PEOPLE_LOOKUP_PROVIDER);
+            PRIVATE_SETTINGS.add(REVERSE_LOOKUP_PROVIDER);
+            PRIVATE_SETTINGS.add(DIALER_OPENCNAM_ACCOUNT_SID);
+            PRIVATE_SETTINGS.add(DIALER_OPENCNAM_AUTH_TOKEN);
         }
 
         /**
@@ -6303,6 +6395,11 @@ public final class Settings {
          */
         public static final String LOCK_SCREEN_ALLOW_REMOTE_INPUT =
                 "lock_screen_allow_remote_input";
+
+        /**
+         * @hide
+         */
+        public static final String LOCK_HIDE_STATUS_BAR = "lockscreen_hide_status_bar";
 
         /**
          * Set by the system to track if the user needs to see the call to action for
