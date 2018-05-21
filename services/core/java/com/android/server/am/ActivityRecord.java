@@ -131,6 +131,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.res.CompatibilityInfo;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.GraphicBuffer;
 import android.graphics.Rect;
@@ -347,6 +348,11 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
 
     private boolean mShowWhenLocked;
     private boolean mTurnScreenOn;
+
+    private final float mFullScreenAspectRatio = Resources.getSystem().getFloat(
+            com.android.internal.R.dimen.config_screenAspectRatio);
+    private final boolean higherAspectRatio = Resources.getSystem().getBoolean(
+            com.android.internal.R.bool.config_haveHigherAspectRatioScreen);
 
     /**
      * Temp configs used in {@link #ensureActivityConfigurationLocked(int, boolean)}
@@ -2284,7 +2290,17 @@ final class ActivityRecord extends ConfigurationContainer implements AppWindowCo
     // TODO(b/36505427): Consider moving this method and similar ones to ConfigurationContainer.
     private void computeBounds(Rect outBounds) {
         outBounds.setEmpty();
-        final float maxAspectRatio = info.maxAspectRatio;
+        float maxAspectRatio = info.maxAspectRatio;
+        if (maxAspectRatio != 0.0f && higherAspectRatio && service.getAspectRatioApps() != null) {
+            if (service.getAspectRatioApps().contains(packageName)) {
+                if (ActivityManagerService.DEBUG_ASPECT_RATIO) {
+                    Log.d(ActivityManagerService.TAG_DEBUG_ASPECT_RATIO,
+                            "Force aspect ratio for " + packageName + " " + maxAspectRatio);
+                }
+                maxAspectRatio = mFullScreenAspectRatio;
+            }
+        }
+
         final ActivityStack stack = getStack();
         if (task == null || stack == null || !task.mFullscreen || maxAspectRatio == 0
                 || isInVrUiMode(getConfiguration())) {
