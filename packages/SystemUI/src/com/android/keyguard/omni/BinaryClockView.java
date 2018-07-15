@@ -50,19 +50,19 @@ import com.android.keyguard.R;
 import com.android.keyguard.KeyguardClockAccessibilityDelegate;
 import com.android.keyguard.KeyguardStatusView;
 import com.android.systemui.statusbar.policy.DateView;
+import com.android.settingslib.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class DigitialClockView extends LinearLayout implements IKeyguardClockView  {
-    private static final String TAG = "DigitialClockView";
+public class BinaryClockView extends LinearLayout implements IKeyguardClockView  {
+    private static final String TAG = "BinaryClockView";
 
     private TextView mAlarmStatusView;
     private DateView mDateView;
-    private TextClock mClockView;
+    private BinaryClock mClockView;
     private View mKeyguardStatusArea;
-    private int mTextColor;
     private int mDateTextColor;
     private int mAlarmTextColor;
     private View[] mVisibleInDoze;
@@ -70,21 +70,18 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
     private final AlarmManager mAlarmManager;
     private float mDarkAmount = 0;
     private boolean mPulsing;
-    private boolean mTwoLine;
-    private boolean mBoldHours;
 
-    private static final String FONT_FAMILY_LIGHT = "sans-serif-light";
     private static final String FONT_FAMILY_MEDIUM = "sans-serif-medium";
 
-    public DigitialClockView(Context context) {
+    public BinaryClockView(Context context) {
         this(context, null, 0);
     }
 
-    public DigitialClockView(Context context, AttributeSet attrs) {
+    public BinaryClockView(Context context, AttributeSet attrs) {
         this(context, attrs, 0);
     }
 
-    public DigitialClockView(Context context, AttributeSet attrs, int defStyle) {
+    public BinaryClockView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
     }
@@ -95,7 +92,6 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
         mAlarmStatusView = findViewById(R.id.alarm_status);
         mDateView = findViewById(R.id.date_view);
         mClockView = findViewById(R.id.clock_view);
-        mClockView.setShowCurrentUserTime(true);
         if (KeyguardClockAccessibilityDelegate.isNeeded(mContext)) {
             mClockView.setAccessibilityDelegate(new KeyguardClockAccessibilityDelegate(mContext));
         }
@@ -106,11 +102,8 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
         visibleInDoze.add(mKeyguardStatusArea);
         mVisibleInDoze = visibleInDoze.toArray(new View[visibleInDoze.size()]);
 
-        mTextColor = mClockView.getCurrentTextColor();
         mDateTextColor = mDateView.getCurrentTextColor();
         mAlarmTextColor = mAlarmStatusView.getCurrentTextColor();
-
-        mClockView.setElegantTextHeight(false);
     }
 
     @Override
@@ -124,15 +117,16 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
             }
         }
     }
-    
+
     @Override
     public void setDark(float darkAmount) {
         if (mDarkAmount == darkAmount) {
             return;
         }
         mDarkAmount = darkAmount;
+        boolean dark = darkAmount == 1;
 
-        mClockView.setTextColor(ColorUtils.blendARGB(mTextColor, Color.WHITE, darkAmount));
+        mClockView.setDark(dark);
         mDateView.setTextColor(ColorUtils.blendARGB(mDateTextColor, Color.WHITE, darkAmount));
         int blendedAlarmColor = ColorUtils.blendARGB(mAlarmTextColor, Color.WHITE, darkAmount);
         mAlarmStatusView.setTextColor(blendedAlarmColor);
@@ -151,22 +145,11 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
                 Settings.System.HIDE_LOCKSCREEN_CLOCK, 0, UserHandle.USER_CURRENT) == 0;
         boolean showDate = Settings.System.getIntForUser(resolver,
                 Settings.System.HIDE_LOCKSCREEN_DATE, 0, UserHandle.USER_CURRENT) == 0;
-        mTwoLine = Settings.System.getIntForUser(resolver,
-                Settings.System.LOCKSCREEN_DIGITAL_CLOCK_TWO_LINES, 0, UserHandle.USER_CURRENT) == 1;
-        mBoldHours = Settings.System.getIntForUser(resolver,
-                Settings.System.LOCKSCREEN_DIGITAL_CLOCK_BOLD_HOUR, 0, UserHandle.USER_CURRENT) == 1;
 
         mClockView.setVisibility(showClock ? View.VISIBLE : View.GONE);
+        mClockView.setTintColor(getTintColor());
         mDateView.setVisibility(showDate ? View.VISIBLE : View.GONE);
         mAlarmStatusView.setVisibility(showAlarm && nextAlarm != null ? View.VISIBLE : View.GONE);
-
-        if (mTwoLine) {
-            mClockView.setSingleLine(false);
-            mClockView.setLineSpacing(getResources().getDimensionPixelSize(R.dimen.digitial_clock_two_line_spacing), 1);
-        } else {
-            mClockView.setSingleLine(true);
-            mClockView.setLineSpacing(0, 1);
-        }
     }
 
     @Override
@@ -191,30 +174,13 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
 
     @Override
     public float getClockTextSize() {
-        return mClockView.getTextSize();
+        return mClockView.getHeight();
     }
 
     @Override
     public void refreshTime() {
+        mClockView.refreshTime();
         mDateView.setDatePattern(Patterns.dateViewSkel);
-
-        if (mTwoLine) {
-            if (mBoldHours) {
-                mClockView.setFormat12Hour(Html.fromHtml("<strong>hh</strong><br>mm"));
-                mClockView.setFormat24Hour(Html.fromHtml("<strong>kk</strong><br>mm"));
-            } else {
-                mClockView.setFormat12Hour("hh\nmm");
-                mClockView.setFormat24Hour("kk\nmm");
-            }
-        } else {
-            if (mBoldHours) {
-                mClockView.setFormat12Hour(Html.fromHtml("<strong>h</strong>\uee01mm"));
-                mClockView.setFormat24Hour(Html.fromHtml("<strong>kk</strong>\uee01mm"));
-            } else {
-                mClockView.setFormat12Hour(Patterns.clockView12);
-                mClockView.setFormat24Hour(Patterns.clockView24);
-            }
-        }
     }
 
     @Override
@@ -236,14 +202,13 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
 
     @Override
     public void onDensityOrFontScaleChanged() {
-        Typeface tfLight = Typeface.create(FONT_FAMILY_LIGHT, Typeface.NORMAL);
+        mClockView.onDensityOrFontScaleChanged();
         Typeface tfMedium = Typeface.create(FONT_FAMILY_MEDIUM, Typeface.NORMAL);
-        mClockView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
-                getResources().getDimensionPixelSize(R.dimen.widget_big_font_size));
-        mClockView.setTypeface(tfLight);
         MarginLayoutParams layoutParams = (MarginLayoutParams) mClockView.getLayoutParams();
         layoutParams.bottomMargin = getResources().getDimensionPixelSize(
-                R.dimen.bottom_text_spacing_digital);
+                R.dimen.bottom_text_spacing_binary);
+        layoutParams.width = getResources().getDimensionPixelSize(R.dimen.binary_clock_width);
+        layoutParams.height = getResources().getDimensionPixelSize(R.dimen.binary_clock_height);
         mClockView.setLayoutParams(layoutParams);
         mDateView.setTextSize(TypedValue.COMPLEX_UNIT_PX,
                 getResources().getDimensionPixelSize(R.dimen.widget_label_font_size));
@@ -274,6 +239,10 @@ public class DigitialClockView extends LinearLayout implements IKeyguardClockVie
     @Override
     public void setPulsing(boolean pulsing) {
         mPulsing = pulsing;
+    }
+
+    private int getTintColor() {
+        return Utils.getColorAttr(getContext(), R.attr.wallpaperTextColor);
     }
 
     // DateFormat.getBestDateTimePattern is extremely expensive, and refresh is called often.

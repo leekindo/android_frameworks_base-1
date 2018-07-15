@@ -4219,6 +4219,12 @@ public final class Settings {
         public static final String QS_TILE_TITLE_VISIBILITY = "qs_tile_title_visibility";
 
         /**
+         * Whether to change the transparency of the qs panel
+         * @hide
+         */
+        public static final String QS_PANEL_BG_ALPHA = "qs_panel_bg_alpha";
+
+        /**
          * @hide
          */
         public static final String QS_LAYOUT_ROWS = "qs_layout_rows";
@@ -4736,6 +4742,24 @@ public final class Settings {
                 "lockscreen_omni_clock_minute_color";
 
         /**
+         * @hide
+         */
+        public static final String LOCKSCREEN_DIGITAL_CLOCK_TWO_LINES =
+                "lockscreen_digital_clock_two_lines";
+
+        /**
+         * @hide
+         */
+        public static final String LOCKSCREEN_DIGITAL_CLOCK_BOLD_HOUR =
+                "lockscreen_digital_clock_bold_hour";
+
+        /**
+         * @hide
+         */
+        public static final String SPLITSCREEN_FORCE_SYSTEMBAR_ENABLED =
+                "splitscreen_force_systembar_enabled";
+
+        /**
          * Settings to backup. This is here so that it's in the same place as the settings
          * keys and easy to update.
          *
@@ -5109,6 +5133,9 @@ public final class Settings {
             PRIVATE_SETTINGS.add(LOCKSCREEN_OMNI_CLOCK_ACCENT_COLOR);
             PRIVATE_SETTINGS.add(LOCKSCREEN_OMNI_CLOCK_HOUR_COLOR);
             PRIVATE_SETTINGS.add(LOCKSCREEN_OMNI_CLOCK_MINUTE_COLOR);
+            PRIVATE_SETTINGS.add(LOCKSCREEN_DIGITAL_CLOCK_TWO_LINES);
+            PRIVATE_SETTINGS.add(LOCKSCREEN_DIGITAL_CLOCK_BOLD_HOUR);
+            PRIVATE_SETTINGS.add(SPLITSCREEN_FORCE_SYSTEMBAR_ENABLED);
         }
 
         /**
@@ -11005,6 +11032,11 @@ public final class Settings {
          * @hide
          */
         public static final String POLICY_CONTROL_STYLE = "policy_control_style";
+
+        /**
+         * @hide
+         */
+        public static final String OVERRIDE_POLICY_CONTROL = "override_policy_control";
 
         /**
          * Defines global zen mode.  ZEN_MODE_OFF, ZEN_MODE_IMPORTANT_INTERRUPTIONS,

@@ -151,7 +151,9 @@ public class OmniAnalogClockView extends LinearLayout implements IKeyguardClockV
 
     @Override
     public void refreshAlarmStatus(AlarmManager.AlarmClockInfo nextAlarm) {
-        if (nextAlarm != null) {
+        boolean showAlarm = Settings.System.getIntForUser(getContext().getContentResolver(),
+                Settings.System.HIDE_LOCKSCREEN_ALARM, 0, UserHandle.USER_CURRENT) == 0;
+        if (showAlarm && nextAlarm != null) {
             String alarm = KeyguardStatusView.formatNextAlarm(mContext, nextAlarm);
             mClockView.setAlarmText(alarm);
         } else {
@@ -179,10 +181,10 @@ public class OmniAnalogClockView extends LinearLayout implements IKeyguardClockV
         AlarmManager.AlarmClockInfo nextAlarm =
                 mAlarmManager.getNextAlarmClock(UserHandle.USER_CURRENT);
         Patterns.update(mContext, nextAlarm != null);
+        updateSettings();
 
         refreshTime();
         refreshAlarmStatus(nextAlarm);
-        updateSettings();
     }
 
     @Override
