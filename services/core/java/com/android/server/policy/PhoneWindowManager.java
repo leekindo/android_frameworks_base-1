@@ -871,6 +871,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mProxiWakeupCheckEnabled;
     private boolean mProxiListenerEnabled;
     private boolean mSplitscreenForceShowSystemBars;
+    private boolean mUseGestureButton;
+    private GestureButton mGestureButton;
+    private boolean mGestureButtonRegistered;
 
     // constants for rotation bits
     private static final int ROTATION_0_MODE = 1;
@@ -1148,6 +1151,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SPLITSCREEN_FORCE_SYSTEMBAR_ENABLED), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.USE_BOTTOM_GESTURE_NAVIGATION), false, this,
                     UserHandle.USER_ALL);
 
             updateSettings();
@@ -2052,7 +2058,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void handleLongPressOnHome(int deviceId) {
+    protected void handleLongPressOnHome(int deviceId) {
         if (mLongPressOnHomeBehaviorCustom == LONG_PRESS_HOME_NOTHING) {
             return;
         }
@@ -2438,6 +2444,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     public void onTrustedChanged() {
                         mWindowManagerFuncs.notifyKeyguardTrustedChanged();
                     }
+
+                    @Override
+                    public void onShowingChanged() {
+                        mWindowManagerFuncs.onKeyguardShowingAndNotOccludedChanged();
+                    }
                 });
 
         String deviceKeyHandlerLib = mContext.getResources().getString(
@@ -2752,12 +2763,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mSplitscreenForceShowSystemBars = Settings.System.getIntForUser(resolver,
                     Settings.System.SPLITSCREEN_FORCE_SYSTEMBAR_ENABLED, 1,
                     UserHandle.USER_CURRENT) != 0;
+            mUseGestureButton = Settings.System.getIntForUser(resolver,
+                    Settings.System.USE_BOTTOM_GESTURE_NAVIGATION, 0,
+                    UserHandle.USER_CURRENT) != 0;
         }
         synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
             WindowManagerPolicyControl.reloadFromSetting(mContext);
         }
         if (updateRotation) {
             updateRotation(true);
+        }
+
+        if (mUseGestureButton && !mHasNavigationBar && !mGestureButtonRegistered) {
+            mGestureButton = new GestureButton(mContext, this);
+            mWindowManagerFuncs.registerPointerEventListener(mGestureButton);
+            mGestureButtonRegistered = true;
+        }
+        if (mGestureButtonRegistered && !mUseGestureButton) {
+            mWindowManagerFuncs.unregisterPointerEventListener(mGestureButton);
+            mGestureButtonRegistered = false;
         }
     }
 
@@ -3946,10 +3970,27 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         return -1;
                     }
                 }
+            } else {
+                // there is one action we could trigger here from keyguard thats important
+                // and thats back key to hide e.g. keypad
+                if (getCustomKeyAction(keyCode) == KEY_ACTION_BACK) {
+                    if (!down) {
+                        performKeyAction(KEY_ACTION_BACK);
+                    }
+                }
             }
             return -1;
         } else if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (!virtualKey) {
+                if (keyguardOn) {
+                    // shortcut for back key in lock screen
+                    if (!isCustomKeyAction(keyCode)) {
+                        if (!down) {
+                            performKeyAction(KEY_ACTION_BACK);
+                        }
+                    }
+                    return -1;
+                }
                 if (down) {
                     if (repeatCount == 0) {
                         if (isCustomKeyAction(keyCode)) {
@@ -4585,7 +4626,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return mSearchManager;
     }
 
-    private void preloadRecentApps() {
+    protected void preloadRecentApps() {
         if (keyguardOn()) {
             return;
         }
@@ -4600,7 +4641,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void cancelPreloadRecentApps() {
+    protected void cancelPreloadRecentApps() {
         if (keyguardOn()) {
             return;
         }
@@ -4616,7 +4657,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void toggleRecentApps() {
+    protected void toggleRecentApps() {
         if (keyguardOn()) {
             return;
         }
@@ -5043,6 +5084,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             updateSysUiVisibility |= layoutStatusBar(pf, df, of, vf, dcf, sysui, isKeyguardShowing);
             if (updateSysUiVisibility) {
                 updateSystemUiVisibilityLw();
+            }
+
+            if (!mHasNavigationBar && mUseGestureButton && mGestureButton != null) {
+                mGestureButton.navigationBarPosition(displayWidth, displayHeight, displayRotation);
             }
         }
     }
@@ -9647,4 +9692,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         public void onAccuracyChanged(Sensor sensor, int accuracy) {
         }
     };
+
+    public boolean isGestureButtonRegion(int x, int y) {
+        if (!mUseGestureButton || mGestureButton == null) {
+            return false;
+        }
+        return mGestureButton.isGestureButtonRegion(x, y);
+    }
+
+    public boolean isGestureButtonEnabled() {
+        return mUseGestureButton;
+    }
 }
