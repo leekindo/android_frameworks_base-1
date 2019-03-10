@@ -525,6 +525,7 @@ public class StatusBar extends SystemUI implements DemoMode,
     protected NotificationLockscreenUserManager mLockscreenUserManager;
     protected NotificationRemoteInputManager mRemoteInputManager;
 
+    private boolean mWallpaperSupportsAmbientMode;
     private BroadcastReceiver mWallpaperChangedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -534,13 +535,16 @@ public class StatusBar extends SystemUI implements DemoMode,
                 return;
             }
             WallpaperInfo info = wallpaperManager.getWallpaperInfo();
-            final boolean supportsAmbientMode = info != null &&
-                    info.getSupportsAmbientMode();
+            mWallpaperSupportsAmbientMode = info != null && info.getSupportsAmbientMode();
 
-            mStatusBarWindowManager.setWallpaperSupportsAmbientMode(supportsAmbientMode);
-            mScrimController.setWallpaperSupportsAmbientMode(supportsAmbientMode);
+            mStatusBarWindowManager.setWallpaperSupportsAmbientMode(mWallpaperSupportsAmbientMode);
+            mScrimController.setWallpaperSupportsAmbientMode(mWallpaperSupportsAmbientMode);
         }
     };
+
+    public boolean wallpaperSupportsAmbientMode(){
+        return mWallpaperSupportsAmbientMode;
+    }
 
     private Runnable mLaunchTransitionEndRunnable;
     protected boolean mLaunchTransitionFadingAway;
@@ -2300,6 +2304,12 @@ public class StatusBar extends SystemUI implements DemoMode,
     @Override
     public void handleSystemKey(int key) {
         if (SPEW) Log.d(TAG, "handleNavigationKey: " + key);
+
+        if (KeyEvent.KEYCODE_MEDIA_PREVIOUS == key || KeyEvent.KEYCODE_MEDIA_NEXT == key) {
+            mMediaManager.onSkipTrackEvent(key, mHandler);
+            return;
+        }
+
         if (!panelsEnabled() || !mKeyguardMonitor.isDeviceInteractive()
                 || mKeyguardMonitor.isShowing() && !mKeyguardMonitor.isOccluded()) {
             return;
@@ -2324,7 +2334,6 @@ public class StatusBar extends SystemUI implements DemoMode,
                 mMetricsLogger.count(NotificationPanelView.COUNTER_PANEL_OPEN_QS, 1);
             }
         }
-
     }
 
     @Override

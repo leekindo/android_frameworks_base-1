@@ -863,6 +863,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private static final int MSG_NOTIFY_USER_ACTIVITY = 29;
     private static final int MSG_RINGER_TOGGLE_CHORD = 30;
     private static final int MSG_TOGGLE_TORCH = 31;
+    private static final int MSG_DISPATCH_VOLKEY_SKIP_TRACK = 32;
 
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_STATUS = 0;
     private static final int MSG_REQUEST_TRANSIENT_BARS_ARG_NAVIGATION = 1;
@@ -881,6 +882,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mGlobalActionsOnLockDisable;
     private boolean mHideNotch;
     private boolean mLongPressPowerTorch;
+    private boolean mVolumeMusicControlActive;
+    private boolean mVolumeMusicControl;
+    private boolean mVolumeWakeActive;
 
     private static final int KEY_ACTION_TOGGLE_TORCH = 9;
 
@@ -994,6 +998,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 case MSG_TOGGLE_TORCH:
                     performKeyAction(KEY_ACTION_TOGGLE_TORCH);
                     break;
+                case MSG_DISPATCH_VOLKEY_SKIP_TRACK: {
+                    sendSkipTrackEventToStatusBar(msg.arg1);
+                    mVolumeMusicControlActive = true;
+                    break;
+                }
             }
         }
     }
@@ -1090,6 +1099,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.OMNI_BOTTOM_GESTURE_SWIPE_LIMIT), false, this,
+                    UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.OMNI_VOLUME_BUTTON_MUSIC_CONTROL), false, this,
                     UserHandle.USER_ALL);
             updateSettings();
         }
@@ -2652,6 +2664,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (mImmersiveModeConfirmation != null) {
                 mImmersiveModeConfirmation.loadSetting(mCurrentUserId);
             }
+
             mOmniSwitchRecents = Settings.System.getIntForUser(resolver,
                     Settings.System.OMNI_NAVIGATION_BAR_RECENTS, 0,
                     UserHandle.USER_CURRENT) == 1;
@@ -2671,7 +2684,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mLongPressPowerTorch = Settings.System.getIntForUser(resolver,
                     Settings.System.OMNI_LONG_PRESS_POWER_TORCH, 0,
                     UserHandle.USER_CURRENT) != 0;
+            mVolumeMusicControl = Settings.System.getIntForUser(resolver,
+                    Settings.System.OMNI_VOLUME_BUTTON_MUSIC_CONTROL, 0,
+                    UserHandle.USER_CURRENT) != 0;
         }
+
         synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
             PolicyControl.reloadFromSetting(mContext);
         }
@@ -6343,6 +6360,28 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_MUTE: {
+                if (mUseTvRouting) {
+                    // On TVs volume keys never go to the foreground app
+                    result &= ~ACTION_PASS_TO_USER;
+                }
+                if (!interactive && isWakeKey && down) {
+                    mVolumeWakeActive = true;
+                    break;
+                }
+                if (!down && mVolumeWakeActive) {
+                    isWakeKey = false;
+                    result &= ~ACTION_PASS_TO_USER;
+                    mVolumeWakeActive = false;
+                    break;
+                }
+                // we come back from a handled music control event - ignore the up event
+                if (!interactive && !down && mVolumeMusicControlActive) {
+                    isWakeKey = false;
+                    result &= ~ACTION_PASS_TO_USER;
+                    mVolumeMusicControlActive = false;
+                    break;
+                }
+
                 if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
                     if (down) {
                         // Any activity on the vol down button stops the ringer toggle shortcut
@@ -6431,11 +6470,35 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     // {@link interceptKeyBeforeDispatching()}.
                     result |= ACTION_PASS_TO_USER;
                 } else if ((result & ACTION_PASS_TO_USER) == 0) {
-                    // If we aren't passing to the user and no one else
-                    // handled it send it to the session manager to
-                    // figure out.
-                    MediaSessionLegacyHelper.getHelper(mContext).sendVolumeKeyEvent(
-                            event, AudioManager.USE_DEFAULT_STREAM_TYPE, true);
+                    if (!interactive && mVolumeMusicControl) {
+                        boolean notHandledMusicControl = false;
+                        if (down) {
+                            if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                                scheduleLongPressKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+                                break;
+                            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                                scheduleLongPressKeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT);
+                                break;
+                            }
+                        } else {
+                            mHandler.removeMessages(MSG_DISPATCH_VOLKEY_SKIP_TRACK);
+                            notHandledMusicControl = true;
+                        }
+
+                        if (notHandledMusicControl) {
+                            KeyEvent newEvent = event;
+                            if (!down) {
+                                // Rewrite the event to use key-down if required
+                                // down is enough to make the volume event handled
+                                newEvent = new KeyEvent(KeyEvent.ACTION_DOWN, keyCode);
+                            }
+                            MediaSessionLegacyHelper.getHelper(mContext).sendVolumeKeyEvent(
+                                    newEvent, AudioManager.USE_DEFAULT_STREAM_TYPE, true);
+                        }
+                    } else {
+                        MediaSessionLegacyHelper.getHelper(mContext).sendVolumeKeyEvent(
+                                event, AudioManager.USE_DEFAULT_STREAM_TYPE, true);
+                    }
                 }
                 break;
             }
@@ -6675,6 +6738,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mHandler.sendMessage(message);
     }
 
+    private void sendSkipTrackEventToStatusBar(int keyCode) {
+        sendSystemKeyToStatusBar(keyCode);
+    }
+
     /**
      * Notify the StatusBar that system rotation suggestion has changed.
      */
@@ -6772,6 +6839,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return false;
         }
 
+        boolean isDozing = isDozeMode();
+
+        if (isDozing) {
+            if (event != null && isVolumeKey(event)) {
+                return false;
+            }
+        }
+
         // Send events to keyguard while the screen is on and it's showing.
         if (isKeyguardShowingAndNotOccluded() && !displayOff) {
             return true;
@@ -6787,19 +6862,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Send events to a dozing dream even if the screen is off since the dream
         // is in control of the state of the screen.
-        IDreamManager dreamManager = getDreamManager();
-
-        try {
-            if (dreamManager != null && dreamManager.isDreaming() && !dreamManager.isDozing()) {
-                return true;
-            }
-        } catch (RemoteException e) {
-            Slog.e(TAG, "RemoteException when checking if dreaming", e);
+        if (isDozing) {
+            return true;
         }
 
         // Otherwise, consume events since the user can't see what is being
         // interacted with.
         return false;
+    }
+
+    private boolean isVolumeKey(KeyEvent event) {
+        return event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_DOWN
+                || event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_UP;
     }
 
     private void dispatchDirectAudioEvent(KeyEvent event) {
@@ -9310,5 +9384,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             }
         }
+    }
+
+    private void scheduleLongPressKeyEvent(int keyCode) {
+        Message msg = mHandler.obtainMessage(MSG_DISPATCH_VOLKEY_SKIP_TRACK, keyCode, 0);
+        msg.setAsynchronous(true);
+        mHandler.sendMessageDelayed(msg, ViewConfiguration.getLongPressTimeout());
     }
 }
