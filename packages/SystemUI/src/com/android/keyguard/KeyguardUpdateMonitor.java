@@ -207,6 +207,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private boolean mKeyguardOccluded;
     @VisibleForTesting
     protected boolean mTelephonyCapable;
+    protected boolean mPulsing;
 
     // Device provisioning state
     private boolean mDeviceProvisioned;
@@ -234,6 +235,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
     private boolean mIsDreaming;
     private final DevicePolicyManager mDevicePolicyManager;
     private boolean mLogoutEnabled;
+
+    // For face unlock identification
+    private String lastBroadcastActionReceived;
 
     /**
      * Short delay before restarting fingerprint authentication after a successful try
@@ -848,11 +852,16 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         }
     };
 
+    public boolean isFaceTrusted(){
+        return lastBroadcastActionReceived.equals(ACTION_FACE_UNLOCK_STOPPED);
+    }
+
     private final BroadcastReceiver mBroadcastAllReceiver = new BroadcastReceiver() {
 
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
+            lastBroadcastActionReceived = action;
             if (AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED.equals(action)) {
                 mHandler.sendEmptyMessage(MSG_TIME_UPDATE);
             } else if (Intent.ACTION_USER_INFO_CHANGED.equals(action)) {
@@ -1791,6 +1800,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
         callback.onClockVisibilityChanged();
         callback.onKeyguardVisibilityChangedRaw(mKeyguardIsVisible);
         callback.onTelephonyCapable(mTelephonyCapable);
+        callback.onPulsing(mPulsing);
         for (Entry<Integer, SimData> data : mSimDatas.entrySet()) {
             final SimData state = data.getValue();
             callback.onSimStateChanged(state.subId, state.slotId, state.simState);
@@ -2101,5 +2111,16 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener {
             pw.println("    strongAuthFlags=" + Integer.toHexString(strongAuthFlags));
             pw.println("    trustManaged=" + getUserTrustIsManaged(userId));
         }
+    }
+
+    public boolean setPulsing(boolean pulsing) {
+        mPulsing = pulsing;
+        for (int i = 0; i < mCallbacks.size(); i++) {
+            KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
+            if (cb != null) {
+                cb.onPulsing(mPulsing);
+            }
+        }
+        return mPulsing;
     }
 }
