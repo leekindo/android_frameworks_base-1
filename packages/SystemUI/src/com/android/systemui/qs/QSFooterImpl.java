@@ -18,22 +18,30 @@ package com.android.systemui.qs;
 
 import static android.app.StatusBarManager.DISABLE2_QUICK_SETTINGS;
 
+import android.content.ContentResolver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.UserInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.database.ContentObserver;
 import android.graphics.PorterDuff.Mode;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.View.OnLongClickListener;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -64,9 +72,10 @@ import com.android.systemui.tuner.TunerService;
 import com.android.systemui.tuner.TunerService.Tunable;
 
 public class QSFooterImpl extends FrameLayout implements QSFooter,
-        OnClickListener, OnUserInfoChangedListener, EmergencyListener, SignalCallback, Tunable {
+        OnClickListener, OnLongClickListener, OnUserInfoChangedListener, EmergencyListener, SignalCallback, Tunable {
 
     public static final String QS_SHOW_DRAG_HANDLE = "qs_show_drag_handle";
+    public static final String QS_SHOW_AUTO_BRIGHTNESS_BUTTON = "qs_show_auto_brightness_button";
 
     private ActivityStarter mActivityStarter;
     private UserInfoController mUserInfoController;
@@ -103,6 +112,38 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
     private final CellSignalState mInfo = new CellSignalState();
     private OnClickListener mExpandClickListener;
 
+    private ImageView mAutoBrightnessIcon;
+    protected View mAutoBrightnessContainer;
+    private boolean mShowAutoBrightnessButton;
+    private boolean mAutoBrightOn;
+    private final Handler mHandler = new Handler();
+
+    private class OmniSettingsObserver extends ContentObserver {
+        private final Uri BRIGHTNESS_MODE_URI =
+                Settings.System.getUriFor(Settings.System.SCREEN_BRIGHTNESS_MODE);
+
+        OmniSettingsObserver(Handler handler) {
+            super(handler);
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            setAutoBrightnessIcon();
+        }
+
+        public void startObserving() {
+            mContext.getContentResolver().registerContentObserver(
+                    BRIGHTNESS_MODE_URI,
+                    false, this, UserHandle.USER_ALL);
+        }
+
+        public void stopObserving() {
+            mContext.getContentResolver().unregisterContentObserver(this);
+        }
+    }
+
+    private OmniSettingsObserver mOmniSettingsObserver = new OmniSettingsObserver(mHandler);
+
     public QSFooterImpl(Context context, AttributeSet attrs) {
         super(context, attrs);
         mColorForeground = Utils.getColorAttr(context, android.R.attr.colorForeground);
@@ -122,6 +163,7 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
         mSettingsButton = findViewById(R.id.settings_button);
         mSettingsContainer = findViewById(R.id.settings_button_container);
         mSettingsButton.setOnClickListener(this);
+        mSettingsButton.setOnLongClickListener(this);
 
         mMobileGroup = findViewById(R.id.mobile_combo);
         mMobileSignal = findViewById(R.id.mobile_signal);
@@ -133,6 +175,10 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
 
         mDragHandle = findViewById(R.id.qs_drag_handle_view);
         mActionsContainer = findViewById(R.id.qs_footer_actions_container);
+
+        mAutoBrightnessContainer = findViewById(R.id.brightness_icon_container);
+        mAutoBrightnessIcon = findViewById(R.id.brightness_icon);
+        mAutoBrightnessIcon.setOnClickListener(this);
 
         // RenderThread is doing more harm than good when touching the header (to expand quick
         // settings), so disable it for this view
@@ -236,11 +282,14 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
         super.onAttachedToWindow();
         final TunerService tunerService = Dependency.get(TunerService.class);
         tunerService.addTunable(this, QS_SHOW_DRAG_HANDLE);
+        tunerService.addTunable(this, QS_SHOW_AUTO_BRIGHTNESS_BUTTON);
     }
 
     @Override
     @VisibleForTesting
     public void onDetachedFromWindow() {
+        // cleanup
+        mOmniSettingsObserver.stopObserving();
         Dependency.get(TunerService.class).removeTunable(this);
         setListening(false);
         super.onDetachedFromWindow();
@@ -250,6 +299,9 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
     public void onTuningChanged(String key, String newValue) {
         if (QS_SHOW_DRAG_HANDLE.equals(key)) {
             setHideDragHandle(newValue != null && Integer.parseInt(newValue) == 0);
+        }
+        if (QS_SHOW_AUTO_BRIGHTNESS_BUTTON.equals(key)) {
+            setHideAutoBright(newValue == null || Integer.parseInt(newValue) == 0);
         }
     }
 
@@ -300,6 +352,7 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
         mMultiUserSwitch.setVisibility(showUserSwitcher(isDemo) ? View.VISIBLE : View.INVISIBLE);
         mEdit.setVisibility(isDemo || !mExpanded ? View.INVISIBLE : View.VISIBLE);
         mSettingsButton.setVisibility(isDemo || !mExpanded ? View.INVISIBLE : View.VISIBLE);
+        mAutoBrightnessContainer.setVisibility(!mShowAutoBrightnessButton || !mExpanded ? View.GONE : View.VISIBLE);
     }
 
     private boolean showUserSwitcher(boolean isDemo) {
@@ -363,7 +416,39 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
                     mExpanded ? MetricsProto.MetricsEvent.ACTION_QS_EXPANDED_SETTINGS_LAUNCH
                             : MetricsProto.MetricsEvent.ACTION_QS_COLLAPSED_SETTINGS_LAUNCH);
             startSettingsActivity();
+        } else if (v == mAutoBrightnessIcon) {
+            if (mAutoBrightOn) {
+                 Settings.System.putIntForUser(mContext.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                        UserHandle.USER_CURRENT);
+                 mAutoBrightOn = false;
+            } else {
+                 Settings.System.putIntForUser(mContext.getContentResolver(),
+                        Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC,
+                        UserHandle.USER_CURRENT);
+                 mAutoBrightOn = true;
+            }
+            setAutoBrightnessIcon(mAutoBrightOn);
         }
+
+    }
+
+    @Override
+    public boolean onLongClick(View v) {
+        if (v == mSettingsButton) {
+            startOmniDashboardActivity();
+        }
+        return false;
+    }
+
+    private ComponentName OMNI_DASHBOARD_FRAGMENT = new ComponentName(
+            "com.android.settings", "com.android.settings.Settings$OmniDashboardActivity");
+
+    private void startOmniDashboardActivity() {
+        mActivityStarter.startActivity(new Intent().setComponent(OMNI_DASHBOARD_FRAGMENT),
+                true /* dismissShade */);
     }
 
     private void startSettingsActivity() {
@@ -457,5 +542,31 @@ public class QSFooterImpl extends FrameLayout implements QSFooter,
 
     private void setHideDragHandle(boolean hide) {
         mDragHandle.setVisibility(hide ? View.GONE : View.VISIBLE);
+    }
+
+    private void setHideAutoBright(boolean hide) {
+        mShowAutoBrightnessButton = !hide;
+        mAutoBrightnessContainer.setVisibility(!mShowAutoBrightnessButton ? View.GONE : View.VISIBLE);
+        if (mShowAutoBrightnessButton) {
+            setAutoBrightnessIcon();
+            mOmniSettingsObserver.startObserving();
+        } else {
+            mOmniSettingsObserver.stopObserving();
+        }
+    }
+
+    private void setAutoBrightnessIcon() {
+        boolean automatic = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                UserHandle.USER_CURRENT) != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL;
+        setAutoBrightnessIcon(automatic);
+    }
+
+    private void setAutoBrightnessIcon(boolean automatic) {
+        mAutoBrightOn = automatic;
+        mAutoBrightnessIcon.setImageResource(automatic ?
+                com.android.systemui.R.drawable.ic_qs_brightness_auto_on_new :
+                com.android.systemui.R.drawable.ic_qs_brightness_auto_off_new);
     }
 }
