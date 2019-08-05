@@ -4256,6 +4256,16 @@ public final class Settings {
                 ANY_INTEGER_VALIDATOR;
 
         /**
+         * @hide
+         */
+        public static final String OMNI_BOTTOM_GESTURE_SWIPE_START =
+                "bottom_gesture_navigation_swipe_start";
+
+        private static final Validator OMNI_BOTTOM_GESTURE_SWIPE_START_VALIDATOR =
+                ANY_INTEGER_VALIDATOR;
+
+
+        /**
          * Number of qs columns on landscape orientation
          * @hide
          */
@@ -4796,6 +4806,16 @@ public final class Settings {
                 BOOLEAN_VALIDATOR;
 
         /**
+         * Enable face auto unlock on secure lock screens
+         *
+         * @hide
+         */
+        public static final String OMNI_DISPLAY_MODE = "omni_display_mode";
+
+        private static final Validator OMNI_DISPLAY_MODE_VALIDATOR =
+                ANY_INTEGER_VALIDATOR;
+
+        /**
          * IMPORTANT: If you add a new public settings you also have to add it to
          * PUBLIC_SETTINGS below. If the new setting is hidden you have to add
          * it to PRIVATE_SETTINGS below. Also add a validator that can validate
@@ -4878,6 +4898,7 @@ public final class Settings {
             OMNI_USE_BOTTOM_GESTURE_NAVIGATION,
             OMNI_BOTTOM_GESTURE_TRIGGER_TIMEOUT,
             OMNI_BOTTOM_GESTURE_SWIPE_LIMIT,
+            OMNI_BOTTOM_GESTURE_SWIPE_START,
             OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE,
             OMNI_QS_LAYOUT_COLUMNS,
             OMNI_QS_TILE_TITLE_VISIBILITY,
@@ -4932,6 +4953,7 @@ public final class Settings {
             OMNI_NAVIGATION_BAR_ARROW_KEYS,
             OMNI_VOLUME_BUTTON_MUSIC_CONTROL,
             OMNI_FACE_AUTO_UNLOCK,
+            OMNI_DISPLAY_MODE,
         };
 
         /**
@@ -5062,6 +5084,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(OMNI_USE_BOTTOM_GESTURE_NAVIGATION);
             PRIVATE_SETTINGS.add(OMNI_BOTTOM_GESTURE_TRIGGER_TIMEOUT);
             PRIVATE_SETTINGS.add(OMNI_BOTTOM_GESTURE_SWIPE_LIMIT);
+            PRIVATE_SETTINGS.add(OMNI_BOTTOM_GESTURE_SWIPE_START);
             PRIVATE_SETTINGS.add(OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE);
             PRIVATE_SETTINGS.add(OMNI_QS_LAYOUT_COLUMNS);
             PRIVATE_SETTINGS.add(OMNI_QS_TILE_TITLE_VISIBILITY);
@@ -5116,6 +5139,7 @@ public final class Settings {
             PRIVATE_SETTINGS.add(OMNI_NAVIGATION_BAR_ARROW_KEYS);
             PRIVATE_SETTINGS.add(OMNI_VOLUME_BUTTON_MUSIC_CONTROL);
             PRIVATE_SETTINGS.add(OMNI_FACE_AUTO_UNLOCK);
+            PRIVATE_SETTINGS.add(OMNI_DISPLAY_MODE);
         }
 
         /**
@@ -5230,6 +5254,8 @@ public final class Settings {
                     OMNI_BOTTOM_GESTURE_TRIGGER_TIMEOUT_VALIDATOR);
             VALIDATORS.put(OMNI_BOTTOM_GESTURE_SWIPE_LIMIT,
                     OMNI_BOTTOM_GESTURE_SWIPE_LIMIT_VALIDATOR);
+            VALIDATORS.put(OMNI_BOTTOM_GESTURE_SWIPE_START,
+                    OMNI_BOTTOM_GESTURE_SWIPE_START_VALIDATOR);
             VALIDATORS.put(OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE,
                     OMNI_QS_LAYOUT_COLUMNS_LANDSCAPE_VALIDATOR);
             VALIDATORS.put(OMNI_QS_LAYOUT_COLUMNS, OMNI_QS_LAYOUT_COLUMNS_VALIDATOR);
@@ -5325,6 +5351,8 @@ public final class Settings {
                     OMNI_VOLUME_BUTTON_MUSIC_CONTROL_VALIDATOR);
             VALIDATORS.put(OMNI_FACE_AUTO_UNLOCK,
                     OMNI_FACE_AUTO_UNLOCK_VALIDATOR);
+            VALIDATORS.put(OMNI_DISPLAY_MODE,
+                    OMNI_DISPLAY_MODE_VALIDATOR);
         }
 
         /**

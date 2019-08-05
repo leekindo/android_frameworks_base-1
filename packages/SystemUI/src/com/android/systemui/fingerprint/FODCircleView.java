@@ -23,17 +23,21 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.Surface;
 import android.view.View.OnTouchListener;
 import android.view.View;
 import android.widget.ImageView;
@@ -64,12 +68,10 @@ public class FODCircleView extends ImageView implements OnTouchListener {
     private final int DISPLAY_NOTIFY_PRESS = 9;
     private final int DISPLAY_SET_DIM = 10;
 
+    private int mCurrentBrightness;
+
     private final WindowManager mWM;
     private final DisplayManager mDisplayManager;
-
-    private final int mCircleX = 444;
-    private final int mCircleY = 1966;
-    private final int mCircleSize = 190;
 
     private boolean mIsDreaming;
     private boolean mIsPulsing;
@@ -152,15 +154,35 @@ public class FODCircleView extends ImageView implements OnTouchListener {
             mInsideCircle = false;
             setDim(false);
         }
+
+        @Override
+        public void onFingerprintError(int msgId, String errString) {
+            super.onFingerprintError(msgId, errString);
+            int mMsgId = msgId;
+            if ((viewAdded) && (mMsgId == 7)) {
+                hide();
+            }
+        }
     };
 
     FODCircleView(Context context) {
         super(context);
 
-        mX = mCircleX;
-        mY = mCircleY;
-        mW = mCircleSize;
-        mH = mCircleSize;
+        String[] location = SystemProperties.get(
+                "persist.vendor.sys.fp.fod.location.X_Y", "").split(",");
+        String[] size = SystemProperties.get(
+                "persist.vendor.sys.fp.fod.size.width_height", "").split(",");
+        if (size.length == 2 && location.length == 2) {
+            mX = Integer.parseInt(location[0]);
+            mY = Integer.parseInt(location[1]);
+            mW = Integer.parseInt(size[0]);
+            mH = Integer.parseInt(size[1]);
+        } else {
+            mX = -1;
+            mY = -1;
+            mW = -1;
+            mH = -1;
+        }
 
         mPaintFingerprint.setAntiAlias(true);
         mPaintFingerprint.setColor(Color.GREEN);
@@ -223,6 +245,13 @@ public class FODCircleView extends ImageView implements OnTouchListener {
         return true;
     }
 
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        if (!viewAdded) return;
+        resetPosition();
+        mWM.updateViewLayout(this, mParams);
+    }
+
     public void show() {
         show(false);
     }
@@ -234,8 +263,7 @@ public class FODCircleView extends ImageView implements OnTouchListener {
         }
         if(mX == -1 || mY == -1 || mW == -1 || mH == -1) return;
 
-        mParams.x = mX;
-        mParams.y = mY;
+        resetPosition();
 
         mParams.height = mW;
         mParams.width = mH;
@@ -270,10 +298,34 @@ public class FODCircleView extends ImageView implements OnTouchListener {
         setDim(false);
     }
 
+    private void resetPosition() {
+        Point size = new Point();
+        mWM.getDefaultDisplay().getRealSize(size);
+        switch (mWM.getDefaultDisplay().getRotation()) {
+                case Surface.ROTATION_90:
+                        mParams.x = mY;
+                        mParams.y = mX;
+                        break;
+                case Surface.ROTATION_270:
+                        mParams.x = size.x - mY - mW
+                                - getContext().getResources()
+                                .getDimensionPixelSize(R.dimen.navigation_bar_size);
+                        mParams.y = mX;
+                        break;
+                case Surface.ROTATION_180:
+                        mParams.x = mX;
+                        mParams.y = size.y - mY - mH;
+                        break;
+                default:
+                        mParams.x = mX;
+                        mParams.y = mY;
+        }
+    }
+
     private void setDim(boolean dim) {
-        int curBrightness = Settings.System.getInt(getContext().getContentResolver(),
+        mCurrentBrightness = Settings.System.getInt(getContext().getContentResolver(),
                         Settings.System.SCREEN_BRIGHTNESS, 100);
-        float dimAmount = (float) curBrightness / 255.0f;
+        float dimAmount = (float) mCurrentBrightness / 255.0f;
         dimAmount = 0.80f - dimAmount;
 
         if (dimAmount < 0) {
@@ -291,13 +343,12 @@ public class FODCircleView extends ImageView implements OnTouchListener {
         } else {
             mParams.dimAmount = .0f;
             mWM.updateViewLayout(this, mParams);
-            mDisplayManager.setTemporaryBrightness(curBrightness);
+            mDisplayManager.setTemporaryBrightness(mCurrentBrightness);
             try {
                 mDisplayDaemon.setMode(DISPLAY_SET_DIM, 0);
                 mDisplayDaemon.setMode(DISPLAY_NOTIFY_PRESS, 0);
             } catch (RemoteException e) {}
-            Settings.System.putIntForUser(mContext.getContentResolver(),
-                    Settings.System.SCREEN_BRIGHTNESS, curBrightness, UserHandle.USER_CURRENT);
+            mDisplayManager.setTemporaryBrightness(-1);
         }
     }
 
